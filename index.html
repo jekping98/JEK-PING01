@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JEK-PING | Antar Jemput Bandar</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif; }
+        body { background:#f97316; min-height:100vh; display:flex; justify-content:center; align-items:center; padding:20px; }
+        .phone { width:375px; height:812px; background:#fff; border-radius:40px; overflow:hidden; box-shadow:0 25px 60px rgba(0,0,0,0.3); display:flex; flex-direction:column; position:relative; }
+        @media(max-width:400px) { .phone { width:100%; height:100vh; border-radius:0; } body { padding:0; } }
+        
+        header { background:#f97316; color:white; padding:20px; }
+        .logo { font-size:24px; font-weight:700; }
+        .logo span { background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:6px; }
+        
+        main { flex:1; overflow-y:auto; padding:20px; }
+        .service-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+        .svc-card { background:#fff7ed; border:2px solid #fde68a; border-radius:16px; padding:20px 10px; text-align:center; cursor:pointer; transition:0.3s; }
+        .svc-card:hover { border-color:#f97316; transform:translateY(-3px); }
+        .svc-icon { font-size:28px; margin-bottom:8px; }
+        .svc-title { font-weight:700; font-size:12px; color:#1a1a2e; }
+        
+        #map { height:250px; border-radius:16px; border:2px solid #fde68a; margin-top:16px; }
+        
+        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center; }
+        .modal.show { display:flex; }
+        .modal-content { background:white; border-radius:20px; padding:24px; width:90%; max-width:340px; max-height:85vh; overflow-y:auto; }
+        .close { float:right; font-size:24px; cursor:pointer; color:#6b7280; }
+        
+        select, input { width:100%; padding:12px; border:2px solid #e5e7eb; border-radius:10px; margin-bottom:10px; font-family:'Poppins'; font-size:13px; }
+        .price-box { background:#f0fdf4; border:1px solid #22c55e; padding:12px; border-radius:10px; text-align:center; margin:12px 0; }
+        .btn-primary { width:100%; padding:14px; background:#f97316; color:white; border:none; border-radius:12px; font-weight:700; cursor:pointer; font-size:14px; }
+        
+        .dana-info { background:#f0f9ff; border:1px dashed #3b82f6; padding:10px; border-radius:8px; font-size:11px; color:#1e40af; margin-top:10px; line-height:1.5; }
+        
+        nav { display:flex; justify-content:space-around; padding:12px 16px 20px; background:#f97316; margin-top:auto; }
+        nav a { color:white; text-decoration:none; font-size:10px; text-align:center; opacity:0.8; }
+        nav a.active { opacity:1; }
+    </style>
+</head>
+<body>
+    <div class="phone">
+        <header>
+            <div class="logo">JEK-<span>PING</span></div>
+            <div style="font-size:10px; opacity:0.9; margin-top:-4px;">Solusi Antar Jemput Kec. Bandar</div>
+        </header>
+        
+        <main>
+            <div style="background:#fffbeb; padding:8px 12px; border-radius:20px; text-align:center; margin-bottom:16px; font-size:10px; font-weight:600; color:#d97706; border:1px dashed #fbbf24;">
+                📍 Area: 8 Desa Kec. Bandar, Pacitan
+            </div>
+            
+            <h2 style="font-size:16px; margin-bottom:4px;">Pilih Layanan</h2>
+            <p style="font-size:10px; color:#6b7280; margin-bottom:14px;">Tarif Rp 2.000/km (Min. Rp 5.000)</p>
+            
+            <div class="service-grid">
+                <div class="svc-card" onclick="openModal('Antar Jemput')">
+                    <div class="svc-icon">🏍️</div>
+                    <div class="svc-title">Antar Jemput</div>
+                </div>
+                <div class="svc-card" onclick="openModal('Antar Barang')">
+                    <div class="svc-icon">📦</div>
+                    <div class="svc-title">Antar Barang</div>
+                </div>
+                <div class="svc-card" onclick="openModal('Antar Makanan')">
+                    <div class="svc-icon">🍜</div>
+                    <div class="svc-title">Antar Makanan</div>
+                </div>
+            </div>
+            
+            <div id="map"></div>
+        </main>
+        
+        <nav>
+            <a href="#" class="active">🏠 Home</a>
+            <a href="#">📋 Riwayat</a>
+            <a href="driver.html">🪪 Driver</a>
+            <a href="admin.html">️ Admin</a>
+        </nav>
+    </div>
+
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle" style="color:#f97316; margin-bottom:12px;">Layanan</h2>
+            
+            <select id="pickupV" onchange="calcPrice()">
+                <option value="">-- Desa Asal --</option>
+                <option value="bandar">Desa Bandar</option>
+                <option value="bangunsari">Desa Bangunsari</option>
+                <option value="jeruk">Desa Jeruk</option>
+                <option value="kledung">Desa Kledung</option>
+                <option value="ngunut">Desa Ngunut</option>
+                <option value="petungsinarang">Desa Petung Sinarang</option>
+                <option value="tumpuk">Desa Tumpuk</option>
+                <option value="watupatok">Desa Watupatok</option>
+            </select>
+            
+            <select id="destV" onchange="calcPrice()">
+                <option value="">-- Desa Tujuan --</option>
+                <option value="bandar">Desa Bandar</option>
+                <option value="bangunsari">Desa Bangunsari</option>
+                <option value="jeruk">Desa Jeruk</option>
+                <option value="kledung">Desa Kledung</option>
+                <option value="ngunut">Desa Ngunut</option>
+                <option value="petungsinarang">Desa Petung Sinarang</option>
+                <option value="tumpuk">Desa Tumpuk</option>
+                <option value="watupatok">Desa Watupatok</option>
+            </select>
+            
+            <div id="priceBox" class="price-box" style="display:none;"></div>
+            
+            <div class="dana-info">
+                💳 Transfer ke: <strong>085136207746</strong> (JEK-PING BANDAR)<br>
+                Nominal: <span id="danaAmt">Rp 0</span>
+            </div>
+            
+            <button class="btn-primary" onclick="createOrder()" style="margin-top:12px;">✅ Saya Sudah Transfer</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const socket = io();
+        let currentFare = 0;
+        let map, driverMarker;
+        
+        const VILLAGES = {
+            bandar: { name:"Desa Bandar", lat:-8.1850, lng:111.1400 },
+            bangunsari: { name:"Desa Bangunsari", lat:-8.1720, lng:111.1550 },
+            jeruk: { name:"Desa Jeruk", lat:-8.1980, lng:111.1280 },
+            kledung: { name:"Desa Kledung", lat:-8.2050, lng:111.1450 },
+            ngunut: { name:"Desa Ngunut", lat:-8.1780, lng:111.1320 },
+            petungsinarang: { name:"Desa Petung Sinarang", lat:-8.1650, lng:111.1480 },
+            tumpuk: { name:"Desa Tumpuk", lat:-8.1920, lng:111.1580 },
+            watupatok: { name:"Desa Watupatok", lat:-8.2100, lng:111.1350 }
+        };
+
+        // Init Map
+        window.onload = () => {
+            map = L.map('map').setView([-8.1850, 111.1400], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            Object.values(VILLAGES).forEach(v => L.marker([v.lat,v.lng]).bindPopup(v.name).addTo(map));
+        };
+
+        function openModal(service) {
+            document.getElementById('modalTitle').textContent = service;
+            document.getElementById('bookingModal').classList.add('show');
+        }
+        function closeModal() { document.getElementById('bookingModal').classList.remove('show'); }
+
+        function calcPrice() {
+            const p = document.getElementById('pickupV').value;
+            const d = document.getElementById('destV').value;
+            const box = document.getElementById('priceBox');
+            
+            if(p && d && VILLAGES[p] && VILLAGES[d]) {
+                const v1 = VILLAGES[p], v2 = VILLAGES[d];
+                const R = 6371;
+                const dLat = (v2.lat-v1.lat)*Math.PI/180;
+                const dLon = (v2.lng-v1.lng)*Math.PI/180;
+                const a = Math.sin(dLat/2)**2 + Math.cos(v1.lat*Math.PI/180)*Math.cos(v2.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+                let dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                let fare = Math.max(dist, 2.5) * 2000;
+                fare = Math.ceil(fare/100)*100;
+                currentFare = fare;
+                
+                const comm = Math.ceil(fare*0.15);
+                const net = fare - comm;
+                
+                box.innerHTML = `<div style="font-size:22px; font-weight:700; color:#15803d;">Rp ${fare.toLocaleString()}</div>
+                    <div style="font-size:10px; color:#6b7280; margin-top:4px;">Komisi (15%): Rp ${comm.toLocaleString()} | Driver: Rp ${net.toLocaleString()}</div>`;
+                box.style.display = 'block';
+                document.getElementById('danaAmt').textContent = `Rp ${fare.toLocaleString()}`;
+            } else {
+                box.style.display = 'none';
+            }
+        }
+
+        function createOrder() {
+            const p = document.getElementById('pickupV').value;
+            const d = document.getElementById('destV').value;
+            if(!p || !d) return alert('Pilih desa asal dan tujuan!');
+            
+            const orderData = {
+                service: document.getElementById('modalTitle').textContent,
+                pickup: VILLAGES[p].name,
+                destination: VILLAGES[d].name,
+                fare: currentFare,
+                latPickup: VILLAGES[p].lat,
+                lngPickup: VILLAGES[p].lng,
+                latDest: VILLAGES[d].lat,
+                lngDest: VILLAGES[d].lng
+            };
+            
+            socket.emit('user:createOrder', orderData);
+            alert('✅ Pesanan dikirim! Menunggu driver menerima...');
+            closeModal();
+        }
+
+        // REAL-TIME: Driver accepted order
+        socket.on('user:orderAccepted', (order) => {
+            alert(`🎉 Driver ${order.driverName} menerima pesanan!\nID: ${order.id}`);
+            
+            // Show driver marker on map
+            if(driverMarker) map.removeLayer(driverMarker);
+            driverMarker = L.marker([order.latPickup, order.lngPickup]).addTo(map).bindPopup("🛵 Driver Menuju Anda").openPopup();
+            map.setView([order.latPickup, order.lngPickup], 15);
+        });
+
+        // REAL-TIME: Driver moving
+        socket.on('user:driverMoved', (data) => {
+            if(driverMarker) {
+                driverMarker.setLatLng([data.lat, data.lng]);
+                map.panTo([data.lat, data.lng]);
+            }
+        });
+    </script>
+</body>
+</html>

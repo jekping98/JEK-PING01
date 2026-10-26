@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>JEK-PING Driver</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif; }
+        body { background:#1a1a2e; color:white; min-height:100vh; }
+        .container { max-width:400px; margin:0 auto; padding:20px; min-height:100vh; display:flex; flex-direction:column; }
+        
+        header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+        .logo { font-size:20px; font-weight:700; }
+        .logo span { color:#f97316; }
+        
+        .toggle-container { background:#1e293b; padding:16px; border-radius:16px; display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+        .switch { position:relative; width:50px; height:26px; }
+        .switch input { opacity:0; width:0; height:0; }
+        .slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:#4b5563; border-radius:26px; transition:.4s; }
+        .slider:before { position:absolute; content:""; height:20px; width:20px; left:3px; bottom:3px; background:white; border-radius:50%; transition:.4s; }
+        input:checked+.slider { background:#22c55e; }
+        input:checked+.slider:before { transform:translateX(24px); }
+        
+        #map { height:300px; border-radius:16px; border:2px solid #374151; margin-bottom:20px; }
+        
+        .order-card { background:#1e293b; border-radius:16px; padding:16px; margin-bottom:12px; border-left:4px solid #f97316; animation:slideIn 0.3s ease; }
+        @keyframes slideIn { from { transform:translateY(-20px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+        
+        .order-header { display:flex; justify-content:space-between; margin-bottom:10px; font-size:12px; }
+        .order-id { color:#fbbf24; font-weight:700; }
+        .order-route { font-size:13px; margin-bottom:10px; line-height:1.6; }
+        .order-fare { font-size:20px; font-weight:700; color:#22c55e; margin-bottom:12px; }
+        
+        .btn-accept { width:100%; padding:12px; background:#22c55e; color:white; border:none; border-radius:10px; font-weight:700; cursor:pointer; font-size:13px; }
+        .btn-reject { width:100%; padding:12px; background:#ef4444; color:white; border:none; border-radius:10px; font-weight:700; cursor:pointer; font-size:13px; margin-top:8px; }
+        
+        .earning-panel { background:#1e293b; border-radius:16px; padding:20px; text-align:center; margin-top:auto; border-left:4px solid #22c55e; }
+        .earning-label { font-size:11px; color:#94a3b8; margin-bottom:6px; }
+        .earning-amount { font-size:28px; font-weight:700; color:#22c55e; }
+        .earning-note { font-size:10px; color:#6b7280; margin-top:6px; }
+        
+        .empty-state { text-align:center; padding:40px 20px; color:#6b7280; font-size:13px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">JEK-<span>PING</span> Driver</div>
+            <div style="font-size:12px; color:#94a3b8;" id="driverStatus">Offline</div>
+        </header>
+        
+        <div class="toggle-container">
+            <span style="font-weight:600;">Status Online</span>
+            <label class="switch">
+                <input type="checkbox" id="onlineToggle" onchange="toggleOnline()">
+                <span class="slider"></span>
+            </label>
+        </div>
+        
+        <div id="map"></div>
+        
+        <div id="ordersContainer">
+            <div class="empty-state">🔔 Belum ada pesanan masuk<br><small>Aktifkan status online untuk menerima order</small></div>
+        </div>
+        
+        <div class="earning-panel">
+            <div class="earning-label">💰 HAK PENDAPATAN ANDA</div>
+            <div class="earning-amount" id="myEarnings">Rp 0</div>
+            <div class="earning-note">*Dicairkan admin setiap minggu</div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const socket = io();
+        let isOnline = false;
+        let map, myMarker;
+        let totalEarnings = 0;
+        
+        // Init Map
+        window.onload = () => {
+            map = L.map('map').setView([-8.1850, 111.1400], 14);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        };
+
+        function toggleOnline() {
+            isOnline = document.getElementById('onlineToggle').checked;
+            document.getElementById('driverStatus').textContent = isOnline ? '🟢 Online' : ' Offline';
+            document.getElementById('driverStatus').style.color = isOnline ? '#22c55e' : '#94a3b8';
+            
+            if(isOnline) {
+                socket.emit('driver:goOnline', { name: 'Budi Setiawan', vehicle: 'Honda Vario' });
+                startGPSTracking();
+            }
+        }
+
+        // REAL-TIME: New order available
+        socket.on('driver:newOrder', (order) => {
+            if(!isOnline) return;
+            
+            // Play notification sound
+            const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVUp6yrhm1tXH+yt4t0bWx8rreLdG1sfK63i3RtbHyut4t0bWx8rreLdG1sfK63i3RtbHyut4t0bWx8rreLdG1sfK63iw==');
+            audio.play().catch(e => {});
+            
+            // Vibrate phone
+            if(navigator.vibrate) navigator.vibrate([200,100,200,100,200]);
+            
+            renderOrderCard(order);
+        });
+
+        function renderOrderCard(order) {
+            const container = document.getElementById('ordersContainer');
+            if(container.querySelector('.empty-state')) container.innerHTML = '';
+            
+            const card = document.createElement('div');
+            card.className = 'order-card';
+            card.id = `order-${order.id}`;
+            card.innerHTML = `
+                <div class="order-header">
+                    <span class="order-id">#${order.id}</span>
+                    <span style="color:#94a3b8;">${order.service}</span>
+                </div>
+                <div class="order-route">
+                    📍 ${order.pickup}<br>
+                    ️<br>
+                    🏁 ${order.destination}
+                </div>
+                <div class="order-fare">Rp ${order.fare.toLocaleString()}</div>
+                <button class="btn-accept" onclick="acceptOrder('${order.id}')">✅ Terima Order</button>
+                <button class="btn-reject" onclick="rejectOrder('${order.id}')">❌ Tolak</button>
+            `;
+            container.prepend(card);
+        }
+
+        function acceptOrder(orderId) {
+            socket.emit('driver:acceptOrder', { orderId, driverId: socket.id });
+            document.getElementById(`order-${orderId}`).remove();
+            alert('✅ Order diterima! Silakan menuju lokasi penjemputan.');
+            
+            // Calculate earnings (85% of fare)
+            // In real app, this comes from server
+            totalEarnings += Math.floor(parseInt(document.querySelector(`#order-${orderId} .order-fare`)?.textContent.replace(/[^0-9]/g,'')) * 0.85) || 0;
+            document.getElementById('myEarnings').textContent = `Rp ${totalEarnings.toLocaleString()}`;
+        }
+
+        function rejectOrder(orderId) {
+            document.getElementById(`order-${orderId}`).remove();
+        }
+
+        // REAL-TIME: Send GPS every 3 seconds
+        function startGPSTracking() {
+            if("geolocation" in navigator) {
+                setInterval(() => {
+                    navigator.geolocation.getCurrentPosition((pos) => {
+                        socket.emit('driver:updateLocation', {
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                            speed: pos.coords.speed || 0
+                        });
+                        
+                        // Update my marker on map
+                        if(myMarker) map.removeLayer(myMarker);
+                        myMarker = L.marker([pos.coords.latitude, pos.coords.longitude]).addTo(map).bindPopup("📍 Saya Di Sini").openPopup();
+                        map.setView([pos.coords.latitude, pos.coords.longitude], 15);
+                    }, null, { enableHighAccuracy: true });
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>

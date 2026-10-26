@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JEK-PING Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Poppins',sans-serif; }
+        body { background:#f3f4f6; }
+        .sidebar { width:240px; background:#1a1a2e; min-height:100vh; position:fixed; left:0; top:0; padding:20px; color:white; }
+        .logo { font-size:22px; font-weight:700; margin-bottom:30px; }
+        .logo span { color:#f97316; }
+        .menu-item { padding:12px 16px; border-radius:10px; margin-bottom:6px; cursor:pointer; font-size:13px; color:#9ca3af; transition:0.3s; }
+        .menu-item:hover, .menu-item.active { background:rgba(249,115,22,0.1); color:#f97316; }
+        
+        .main { margin-left:240px; padding:30px; }
+        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; }
+        .header h1 { font-size:24px; color:#1a1a2e; }
+        
+        .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; margin-bottom:30px; }
+        .stat-card { background:white; padding:20px; border-radius:16px; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+        .stat-label { font-size:11px; color:#6b7280; margin-bottom:6px; }
+        .stat-value { font-size:24px; font-weight:700; color:#1a1a2e; }
+        
+        .card { background:white; border-radius:16px; padding:24px; box-shadow:0 2px 8px rgba(0,0,0,0.04); margin-bottom:20px; }
+        .card h3 { font-size:16px; margin-bottom:16px; color:#1a1a2e; }
+        
+        table { width:100%; border-collapse:collapse; }
+        th { text-align:left; padding:12px; font-size:11px; color:#6b7280; border-bottom:2px solid #f3f4f6; }
+        td { padding:12px; font-size:13px; border-bottom:1px solid #f3f4f6; }
+        .badge { padding:4px 10px; border-radius:20px; font-size:10px; font-weight:600; }
+        .badge-green { background:rgba(34,197,94,0.1); color:#22c55e; }
+        .badge-orange { background:rgba(249,115,22,0.1); color:#f97316; }
+        
+        .withdraw-section { border:2px solid #f97316; border-radius:16px; padding:24px; margin-top:20px; }
+        .withdraw-input { width:100%; padding:12px; border:2px solid #e5e7eb; border-radius:10px; margin:12px 0; font-family:'Poppins'; }
+        .btn-withdraw { width:100%; padding:14px; background:#f97316; color:white; border:none; border-radius:10px; font-weight:700; cursor:pointer; }
+        
+        @media(max-width:768px) { 
+            .sidebar { transform:translateX(-100%); transition:0.3s; z-index:100; } 
+            .sidebar.open { transform:translateX(0); } 
+            .main { margin-left:0; } 
+            .stats { grid-template-columns:repeat(2,1fr); } 
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar" id="sidebar">
+        <div class="logo">JEK-<span>PING</span></div>
+        <div class="menu-item active" onclick="showTab('dashboard')"> Dashboard</div>
+        <div class="menu-item" onclick="showTab('wallet')">💰 Dompet Komisi</div>
+        <div class="menu-item" onclick="showTab('drivers')"> Driver Online</div>
+        <div class="menu-item" onclick="showTab('orders')">📋 Pesanan</div>
+    </div>
+    
+    <div class="main">
+        <div class="header">
+            <h1 id="pageTitle">Dashboard</h1>
+            <button onclick="document.getElementById('sidebar').classList.toggle('open')" style="display:none; background:none; border:none; font-size:24px; cursor:pointer;" id="menuBtn">☰</button>
+        </div>
+        
+        <div id="tab-dashboard">
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-label">Total Pesanan</div>
+                    <div class="stat-value" id="totalOrders">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Total Omzet</div>
+                    <div class="stat-value" id="totalRevenue">Rp 0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Driver Online</div>
+                    <div class="stat-value" id="onlineDrivers">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Komisi Platform</div>
+                    <div class="stat-value" id="totalCommission" style="color:#f97316;">Rp 0</div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h3>Pesanan Terbaru (Real-Time)</h3>
+                <table>
+                    <thead><tr><th>ID</th><th>Layanan</th><th>Rute</th><th>Tarif</th><th>Status</th></tr></thead>
+                    <tbody id="ordersTable"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="tab-wallet" style="display:none;">
+            <div class="card">
+                <h3>💰 Dompet Komisi Platform</h3>
+                <div style="font-size:36px; font-weight:700; color:#f97316; margin:20px 0;" id="walletBalance">Rp 6.780.000</div>
+                <p style="font-size:12px; color:#6b7280; margin-bottom:20px;">Akumulasi 15% dari semua transaksi. Dana tersimpan aman di rekening platform.</p>
+                
+                <div class="withdraw-section">
+                    <h4 style="margin-bottom:12px;">Tarik Dana ke Rekening Utama</h4>
+                    <input type="number" class="withdraw-input" id="withdrawAmount" placeholder="Masukkan nominal penarikan">
+                    <button class="btn-withdraw" onclick="withdraw()">🏦 Tarik Dana Sekarang</button>
+                </div>
+                
+                <h4 style="margin:24px 0 12px;">Riwayat Penarikan</h4>
+                <table>
+                    <thead><tr><th>Tanggal</th><th>Nominal</th><th>Status</th></tr></thead>
+                    <tbody id="withdrawHistory">
+                        <tr><td>20 Okt 2026</td><td>Rp 5.000.000</td><td><span class="badge badge-green">Sukses</span></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="tab-drivers" style="display:none;">
+            <div class="card">
+                <h3>🛵 Driver Online (Real-Time)</h3>
+                <table>
+                    <thead><tr><th>Nama</th><th>Kendaraan</th><th>Status</th><th>Last Update</th></tr></thead>
+                    <tbody id="driversTable"></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div id="tab-orders" style="display:none;">
+            <div class="card">
+                <h3>📋 Semua Pesanan</h3>
+                <table>
+                    <thead><tr><th>ID</th><th>User</th><th>Driver</th><th>Tarif</th><th>Komisi</th><th>Status</th></tr></thead>
+                    <tbody id="allOrdersTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        let orders = [];
+        let wallet = 6780000;
+        
+        function showTab(tab) {
+            ['dashboard','wallet','drivers','orders'].forEach(t => document.getElementById(`tab-${t}`).style.display = 'none');
+            document.getElementById(`tab-${tab}`).style.display = 'block';
+            document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            const titles = { dashboard:'Dashboard', wallet:'Dompet Komisi', drivers:'Driver Online', orders:'Semua Pesanan' };
+            document.getElementById('pageTitle').textContent = titles[tab];
+            
+            if(window.innerWidth <= 768) document.getElementById('sidebar').classList.remove('open');
+        }
+
+        // REAL-TIME: New order
+        socket.on('admin:newOrder', (order) => {
+            orders.unshift(order);
+            updateDashboard();
+        });
+
+        // REAL-TIME: Wallet update
+        socket.on('admin:walletUpdate', (amount) => {
+            wallet = amount;
+            document.getElementById('walletBalance').textContent = `Rp ${wallet.toLocaleString()}`;
+            document.getElementById('totalCommission').textContent = `Rp ${(wallet/1000000).toFixed(1)}jt`;
+        });
+
+        // REAL-TIME: Drivers update
+        socket.on('admin:driversUpdate', (driversList) => {
+            document.getElementById('onlineDrivers').textContent = driversList.length;
+            const tbody = document.getElementById('driversTable');
+            tbody.innerHTML = driversList.map(d => `
+                <tr>
+                    <td>${d.name}</td>
+                    <td>${d.vehicle}</td>
+                    <td><span class="badge badge-green">Online</span></td>
+                    <td>${new Date(d.lastUpdate).toLocaleTimeString()}</td>
+                </tr>
+            `).join('');
+        });
+
+        // REAL-TIME: Withdraw success
+        socket.on('admin:withdrawSuccess', (data) => {
+            const tbody = document.getElementById('withdrawHistory');
+            const row = `<tr><td>${new Date(data.date).toLocaleDateString('id-ID')}</td><td>Rp ${data.amount.toLocaleString()}</td><td><span class="badge badge-orange">Proses</span></td></tr>`;
+            tbody.insertAdjacentHTML('afterbegin', row);
+            alert(`✅ Penarikan Rp ${data.amount.toLocaleString()} berhasil diproses!`);
+        });
+
+        function updateDashboard() {
+            document.getElementById('totalOrders').textContent = orders.length;
+            const totalRev = orders.reduce((sum,o) => sum + o.fare, 0);
+            document.getElementById('totalRevenue').textContent = `Rp ${totalRev.toLocaleString()}`;
+            
+            const tbody = document.getElementById('ordersTable');
+            tbody.innerHTML = orders.slice(0,10).map(o => `
+                <tr>
+                    <td>#${o.id}</td>
+                    <td>${o.service}</td>
+                    <td>${o.pickup} → ${o.destination}</td>
+                    <td>Rp ${o.fare.toLocaleString()}</td>
+                    <td><span class="badge ${o.status==='accepted'?'badge-green':'badge-orange'}">${o.status==='accepted'?'Diterima':'Menunggu'}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        function withdraw() {
+            const amount = parseInt(document.getElementById('withdrawAmount').value);
+            if(!amount || amount <= 0) return alert('Masukkan nominal valid!');
+            if(amount > wallet) return alert('Saldo tidak mencukupi!');
+            if(confirm(`Tarik Rp ${amount.toLocaleString()} ke rekening BCA?`)) {
+                socket.emit('admin:withdraw', amount);
+                document.getElementById('withdrawAmount').value = '';
+            }
+        }
+
+        // Show menu button on mobile
+        if(window.innerWidth <= 768) document.getElementById('menuBtn').style.display = 'block';
+    </script>
+</body>
+</html>
